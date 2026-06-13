@@ -10,6 +10,7 @@ sfx_fail,insufficient / timeout,audio (sfx),descending saw womp,~0.4s,—,Web Au
 sfx_batch,supply dispatched (PEDIR),audio (sfx),conveyor whirr + bell ding,~0.4s,—,Web Audio synth,delivered
 sfx_lever,mix lever pull,audio (sfx),two-step square clunk,~0.1s,—,Web Audio synth,delivered
 sfx_trash,discard,audio (sfx),lowpassed thunk,~0.2s,—,Web Audio synth,delivered
-world_3d,all in-game geometry (hero/robots/double belt/stations/items),procedural 3D (Three.js StandardMaterial primitives),glossy toy-look rounded primitives + badge sprites; fill+rim lights; pastel gradient sky,n/a,STYLE FORMULA v3,procedural-code,delivered
+mdl_robot,delivery robot (cloned per spawn),3D model (image-to-3D GLB; textures downscaled 4096->1024; ~50k tris; 2.46MB),user-generated GLB integrated via GLTFLoader; eyes/slot/UI overlaid procedurally,~50k tris,STYLE FORMULA v3,user-provided GLB,delivered
+world_3d,remaining geometry (hero/double belt/stations/items),procedural 3D (Three.js StandardMaterial primitives),glossy toy-look rounded primitives + badge sprites; fill+rim lights; pastel gradient sky,n/a,STYLE FORMULA v3,procedural-code,delivered
 ui_dom,menu / HUD / overlays,DOM + CSS,warm cream panels with thick navy borders,responsive,STYLE FORMULA v3,procedural-code,delivered
 NOTE,image-to-3D meshes deferred,—,sandbox egress cannot fetch Higgsfield CDN GLBs and headless env has no WebGL to verify; not shipped to avoid a broken deploy,—,—,—,deferred
