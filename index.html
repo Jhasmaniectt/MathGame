@@ -172,20 +172,21 @@ const rimLight=new THREE.DirectionalLight(0xffd6a0,0.25);
 rimLight.position.set(-6,9,14);scene.add(rimLight);
 
 /* ---------- cámara: UN SOLO POV ESTÁTICO ---------- */
-const CAM={az:0,pol:Math.PI/3,tgt:new THREE.Vector3(0,0,1)};
+let camZoom=0.8;
+const CAM={az:0,pol:Math.PI/5,tgt:new THREE.Vector3(0,0,0)};
 function fitCamera(){
   const aspect=innerWidth/innerHeight;
   camera.aspect=aspect;
   const vF=THREE.MathUtils.degToRad(50);
   const hF=2*Math.atan(Math.tan(vF/2)*aspect);
   const dW=18.5/Math.tan(hF/2);
-  const dH=14.5/Math.tan(vF/2);
-  const r=Math.min(Math.max(Math.max(dW,dH),26),70);
+  const dH=13.2/Math.tan(vF/2);
+  const r=Math.min(Math.max(Math.max(dW,dH)*camZoom,14),65);
   camera.position.set(
     CAM.tgt.x+r*Math.sin(CAM.pol)*Math.sin(CAM.az),
     CAM.tgt.y+r*Math.cos(CAM.pol),
     CAM.tgt.z+r*Math.sin(CAM.pol)*Math.cos(CAM.az));
-  camera.up.set(0,1,0);camera.lookAt(CAM.tgt);
+  camera.up.set(0,0,-1);camera.lookAt(CAM.tgt);
   camera.updateProjectionMatrix();
 }
 function onResize(){
@@ -700,6 +701,7 @@ function groundNav(px,py){
   }
 }
 cv.addEventListener('pointerdown',e=>{
+  if(twoFinger)return;
   SND.kick();downXY={x:e.clientX,y:e.clientY};holding=true;
   const m=new THREE.Vector2((e.clientX/innerWidth)*2-1,-(e.clientY/innerHeight)*2+1);
   ray.setFromCamera(m,camera);
@@ -707,14 +709,38 @@ cv.addEventListener('pointerdown',e=>{
   holdIsNav=!hits.some(h=>findHandler(h.object)!==null);
   if(holdIsNav)groundNav(e.clientX,e.clientY);
 });
-cv.addEventListener('pointermove',e=>{if(holding&&holdIsNav)groundNav(e.clientX,e.clientY);});
+cv.addEventListener('pointermove',e=>{if(!twoFinger&&holding&&holdIsNav)groundNav(e.clientX,e.clientY);});
 cv.addEventListener('pointerup',e=>{
+  if(twoFinger){holding=false;downXY=null;return;}
   holding=false;
   if(downXY&&Math.hypot(e.clientX-downXY.x,e.clientY-downXY.y)<9)
     clickQueue.push({x:e.clientX,y:e.clientY});
   downXY=null;
 });
 cv.addEventListener('pointercancel',()=>{holding=false;holdIsNav=false;downXY=null;});
+
+/* ---------- gestos de cámara: 2 dedos (pinch zoom + pan horizontal) ---------- */
+let twoFinger=false,pinchD0=1,pinchZ0=0.8,panX0=0,panTgt0=0;
+function pinchDist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+cv.addEventListener('touchstart',e=>{
+  if(e.touches.length>=2){
+    twoFinger=true;holding=false;holdIsNav=false;downXY=null;
+    pinchD0=pinchDist(e.touches);pinchZ0=camZoom;
+    panX0=(e.touches[0].clientX+e.touches[1].clientX)*0.5;
+    panTgt0=CAM.tgt.x;
+  }
+},{passive:true});
+cv.addEventListener('touchmove',e=>{
+  if(!twoFinger||e.touches.length<2)return;
+  const d=pinchDist(e.touches);
+  camZoom=Math.min(Math.max(pinchZ0*(d/pinchD0),0.45),1.4);
+  const midX=(e.touches[0].clientX+e.touches[1].clientX)*0.5;
+  CAM.tgt.x=Math.min(Math.max(panTgt0-(midX-panX0)/innerWidth*16,-8),8);
+  fitCamera();
+},{passive:true});
+cv.addEventListener('touchend',e=>{
+  if(e.touches.length<2){twoFinger=false;holding=false;}
+},{passive:true});
 function findHandler(o){while(o){if(o.userData&&o.userData.onClick)return o.userData.onClick;o=o.parent;}return null;}
 function pick(px,py){
   if(state!=='play')return;
