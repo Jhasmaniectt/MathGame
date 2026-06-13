@@ -28,6 +28,8 @@
   .dim{filter:grayscale(1);opacity:.3!important;transform:scale(1)!important}
   #toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#fff8e8;color:#2b3a55;border:3px solid #2b3a55;padding:7px 18px;border-radius:14px;font-weight:bold;font-size:clamp(12px,3vw,16px);opacity:0;transition:opacity .3s;pointer-events:none;z-index:6;box-shadow:0 3px 0 #2b3a5540;white-space:nowrap}
   #dev{position:fixed;top:4px;left:4px;color:#0a0;font:12px monospace;display:none;z-index:20;background:#000a;padding:2px 6px;border-radius:4px}
+  #fsBtn{position:fixed;bottom:14px;right:14px;width:46px;height:46px;border-radius:12px;border:3px solid #2b3a55;background:#fff8e8cc;cursor:pointer;z-index:15;box-shadow:0 3px 0 #2b3a5540;display:flex;align-items:center;justify-content:center;padding:0;touch-action:manipulation;}
+  #fsBtn:active{transform:translateY(3px);box-shadow:0 0 0 #2b3a5540}
 </style>
 </head>
 <body>
@@ -38,6 +40,7 @@
 </div>
 <div id="toast"></div>
 <div id="dev"></div>
+<button id="fsBtn" title="Pantalla completa"></button>
 
 <div class="ov" id="menu">
   <h1><span id="t1"></span><span class="em" id="t2"></span><span id="t3"></span></h1>
@@ -169,20 +172,20 @@ const rimLight=new THREE.DirectionalLight(0xffd6a0,0.25);
 rimLight.position.set(-6,9,14);scene.add(rimLight);
 
 /* ---------- cámara: UN SOLO POV ESTÁTICO ---------- */
-const CAM={az:0,pol:Math.PI/5,tgt:new THREE.Vector3(0,0,0)};
+const CAM={az:0,pol:Math.PI/3,tgt:new THREE.Vector3(0,0,1)};
 function fitCamera(){
   const aspect=innerWidth/innerHeight;
   camera.aspect=aspect;
   const vF=THREE.MathUtils.degToRad(50);
   const hF=2*Math.atan(Math.tan(vF/2)*aspect);
   const dW=18.5/Math.tan(hF/2);
-  const dH=13.2/Math.tan(vF/2);
-  const r=Math.min(Math.max(Math.max(dW,dH),22),70);
+  const dH=14.5/Math.tan(vF/2);
+  const r=Math.min(Math.max(Math.max(dW,dH),26),70);
   camera.position.set(
     CAM.tgt.x+r*Math.sin(CAM.pol)*Math.sin(CAM.az),
     CAM.tgt.y+r*Math.cos(CAM.pol),
     CAM.tgt.z+r*Math.sin(CAM.pol)*Math.cos(CAM.az));
-  camera.up.set(0,0,-1);camera.lookAt(CAM.tgt);
+  camera.up.set(0,1,0);camera.lookAt(CAM.tgt);
   camera.updateProjectionMatrix();
 }
 function onResize(){
@@ -895,6 +898,27 @@ $('retryBtn').onclick=()=>{SND.kick();startRound();};
 $('nextBtn').onclick=()=>{SND.kick();level=Math.min(level+1,10);startRound();};
 $('menuBtn').onclick=()=>{state='menu';$('result').style.display='none';$('hud').style.display='none';buildMenu();$('menu').style.display='flex';};
 buildMenu();
+
+/* ---------- pantalla completa ---------- */
+const FS_IN=`<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#2b3a55" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="12,2 18,2 18,8"/><polyline points="8,18 2,18 2,12"/><line x1="18" y1="2" x2="11" y2="9"/><line x1="2" y1="18" x2="9" y2="11"/></svg>`;
+const FS_OUT=`<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#2b3a55" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18,8 12,8 12,2"/><polyline points="2,12 8,12 8,18"/><line x1="12" y1="8" x2="19" y2="1"/><line x1="1" y1="19" x2="8" y2="12"/></svg>`;
+const fsBtn=$('fsBtn');
+fsBtn.innerHTML=FS_IN;
+fsBtn.addEventListener('click',()=>{
+  if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+    const el=document.documentElement;
+    (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen||function(){}).call(el);
+  }else{
+    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen||function(){}).call(document);
+  }
+});
+function onFsChange(){
+  const full=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  fsBtn.innerHTML=full?FS_OUT:FS_IN;
+  if(full){screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}
+}
+document.addEventListener('fullscreenchange',onFsChange);
+document.addEventListener('webkitfullscreenchange',onFsChange);
 </script>
 </body>
 </html>
