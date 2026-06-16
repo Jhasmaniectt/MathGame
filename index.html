@@ -30,6 +30,9 @@
   #dev{position:fixed;top:4px;left:4px;color:#0a0;font:12px monospace;display:none;z-index:20;background:#000a;padding:2px 6px;border-radius:4px}
   #fsBtn{position:fixed;bottom:14px;right:14px;width:46px;height:46px;border-radius:12px;border:3px solid #2b3a55;background:#fff8e8cc;cursor:pointer;z-index:15;box-shadow:0 3px 0 #2b3a5540;display:flex;align-items:center;justify-content:center;padding:0;touch-action:manipulation;}
   #fsBtn:active{transform:translateY(3px);box-shadow:0 0 0 #2b3a5540}
+  #joyZone{position:fixed;bottom:22px;left:22px;width:134px;height:134px;z-index:15;touch-action:none;-webkit-touch-callout:none;display:none}
+  #joyBase{position:absolute;inset:0;border-radius:50%;background:rgba(43,58,85,0.16);border:3px solid rgba(43,58,85,0.38);box-shadow:0 4px 18px rgba(0,0,0,0.13)}
+  #joyKnob{position:absolute;width:56px;height:56px;border-radius:50%;background:rgba(43,58,85,0.55);border:3px solid rgba(43,58,85,0.82);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.22);transition:background 0.1s}
 </style>
 </head>
 <body>
@@ -39,6 +42,7 @@
   <div class="pill"><span id="hOkLbl"></span><b id="hOk">0</b></div>
 </div>
 <div id="toast"></div>
+<div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
 <div id="dev"></div>
 <button id="fsBtn" title="Pantalla completa"></button>
 
@@ -355,6 +359,7 @@ const charG=buildChar();scene.add(charG);
 /* velocidad original 6.5 × 1.5 = 9.75 */
 const C={x:0,z:2,tx:0,tz:2,speed:9.75,walking:false,onArrive:null,carrying:false,carryMesh:null};
 charG.position.set(C.x,0,C.z);
+const JOY={active:false,nx:0,nz:0};
 
 /* puntos clave */
 const POS={
@@ -382,7 +387,7 @@ function after(ms,fn){G.after.push({t:ms,fn});}
 
 function startRound(){
   $('menu').style.display='none';$('result').style.display='none';
-  $('hud').style.display='flex';
+  $('hud').style.display='flex';$('joyZone').style.display='block';
   [beltItemsG,tableItemsG,pkgRootG,robotsRootG,fxG,raysG].forEach(clearGroup);
   attempts++;
   rng=mulberry32(level*1009+attempts*7919+12345);
@@ -669,6 +674,7 @@ function puff(x,y,z,color,n){
 function endRound(){
   if(state!=='play')return;
   state='result';
+  $('joyZone').style.display='none';resetJoy();
   const ok=G.ok;
   let stars=ok>=10?3:(ok>=8?2:(ok>=6?1:0));
   $('result').style.display='flex';
@@ -718,6 +724,53 @@ cv.addEventListener('pointerup',e=>{
   downXY=null;
 });
 cv.addEventListener('pointercancel',()=>{holding=false;holdIsNav=false;downXY=null;});
+
+/* ---------- joystick virtual (esquina inferior-izquierda) ---------- */
+const joyZone=$('joyZone');
+const joyKnob=$('joyKnob');
+const JOY_R=39; // radio de movimiento del knob en px
+let joyPtrId=null;
+function resetJoy(){
+  JOY.active=false;JOY.nx=0;JOY.nz=0;
+  joyKnob.style.transform='translate(-50%,-50%)';
+  if(state==='play'){C.tx=C.x;C.tz=C.z;}
+}
+function updateJoy(e){
+  const rect=joyZone.getBoundingClientRect();
+  let dx=e.clientX-(rect.left+rect.width*0.5);
+  let dy=e.clientY-(rect.top+rect.height*0.5);
+  const dist=Math.hypot(dx,dy);
+  if(dist>JOY_R){dx=dx/dist*JOY_R;dy=dy/dist*JOY_R;}
+  const dead=6;
+  JOY.active=dist>dead;
+  JOY.nx=dist>dead?dx/JOY_R:0;
+  JOY.nz=dist>dead?dy/JOY_R:0; // dy>0=pantalla abajo=mundo +Z (hacia cámara)
+  joyKnob.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;
+}
+joyZone.addEventListener('pointerdown',e=>{
+  e.stopPropagation();e.preventDefault();
+  SND.kick();
+  if(joyPtrId!==null)return;
+  joyPtrId=e.pointerId;
+  joyZone.setPointerCapture(e.pointerId);
+  updateJoy(e);
+},{passive:false});
+joyZone.addEventListener('pointermove',e=>{
+  if(e.pointerId!==joyPtrId)return;
+  e.preventDefault();
+  updateJoy(e);
+},{passive:false});
+joyZone.addEventListener('pointerup',e=>{
+  if(e.pointerId!==joyPtrId)return;
+  joyPtrId=null;
+  joyZone.releasePointerCapture(e.pointerId);
+  resetJoy();
+});
+joyZone.addEventListener('pointercancel',e=>{
+  if(e.pointerId!==joyPtrId)return;
+  joyPtrId=null;
+  resetJoy();
+});
 
 /* ---------- gestos de cámara: 2 dedos (pinch zoom + pan horizontal) ---------- */
 let twoFinger=false,pinchD0=1,pinchZ0=0.8,panX0=0,panTgt0=0;
@@ -816,6 +869,12 @@ function update(dt){
     if(k>=1&&!tw.done){tw.done=true;if(tw.end)tw.end();}
   }
   G.tweens=G.tweens.filter(t=>!t.done);
+  // joystick: actualiza destino del héroe si está activo y sin callback pendiente
+  if(JOY.active&&!C.onArrive){
+    const LA=1.6;
+    C.tx=Math.min(Math.max(C.x+JOY.nx*LA,-9.2),9.2);
+    C.tz=Math.min(Math.max(C.z+JOY.nz*LA,-5.2),8.4);
+  }
   // héroe
   const d=dist2(C.tx,C.tz,C.x,C.z);
   if(d>0.12){
@@ -922,7 +981,7 @@ function buildMenu(){
 $('playBtn').onclick=()=>{SND.kick();startRound();};
 $('retryBtn').onclick=()=>{SND.kick();startRound();};
 $('nextBtn').onclick=()=>{SND.kick();level=Math.min(level+1,10);startRound();};
-$('menuBtn').onclick=()=>{state='menu';$('result').style.display='none';$('hud').style.display='none';buildMenu();$('menu').style.display='flex';};
+$('menuBtn').onclick=()=>{state='menu';$('result').style.display='none';$('hud').style.display='none';$('joyZone').style.display='none';resetJoy();buildMenu();$('menu').style.display='flex';};
 buildMenu();
 
 /* ---------- pantalla completa ---------- */
